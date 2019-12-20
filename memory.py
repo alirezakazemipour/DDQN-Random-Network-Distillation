@@ -13,8 +13,23 @@ class Memory:
         self.mem_size = mem_size
         self.tree = SumTree(mem_size)
 
-    def sample(self):
-        pass
+    def sample(self, k):
+
+        batch = []
+        segment = self.tree.total() // k
+        indices = []
+        priorities = []
+
+        self.beta = np.min([1.0, self.beta + self.beta_growth_rate])
+
+        for i in range(k):
+            a = segment * i
+            b = segment * (i+1)
+
+            s = np.random.uniform(low = a, high = b)
+            idx, priority, data = self.tree.get(s)
+
+
 
     def add(self, error, transition):
         p = self.get_priority(error)

@@ -23,7 +23,7 @@ class Agent:
         exp_probability = self.min_epsilon + (self.epsilon - self.min_epsilon) * np.exp(-self.decay_rate * step)
 
         if exp < exp_probability:
-            print(f"epsilon:{exp:0.3f}")
+            print("epsilon:{:0.3f}".format(exp))
             return np.random.randint(self.n_actions)
         else:
             return np.argmax(self.eval_model.predict(state))
@@ -37,5 +37,5 @@ class Agent:
             self.env.render()
             if done:
                 self.env.reset()
-            print(f"step:{step}")
+            print("step:{}".format(step))
             state = next_state

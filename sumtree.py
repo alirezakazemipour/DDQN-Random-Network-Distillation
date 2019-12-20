@@ -53,5 +53,9 @@ class SumTree:
             s -= self.tree[left_child]
             return self.get_leaf_index(right_child, s)
 
-    def get(self):
-        pass
+    def get(self, s):
+        idx = self.get_leaf_index(0, s)
+        p = self.tree[idx]
+        data = self.data[idx - self.transition_size + 1]
+
+        return idx, p, data
