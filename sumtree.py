@@ -4,6 +4,7 @@ import numpy as np
 
 class SumTree:
     data_pointer = 0
+    memory_counter = 0
 
     def __init__(self, transition_size):
 
@@ -39,6 +40,9 @@ class SumTree:
         if self.data_pointer >= self.transition_size:
             self.data_pointer = 0
 
+        if self.memory_counter < self.transition_size:
+            self.memory_counter += 1
+
     def get_leaf_index(self, parent_idx, s):
 
         left_child = 2 * parent_idx + 1
@@ -59,3 +63,6 @@ class SumTree:
         data = self.data[idx - self.transition_size + 1]
 
         return idx, p, data
+
+    def min_priority(self):
+        return np.min(self.tree[self.transition_size -1:])

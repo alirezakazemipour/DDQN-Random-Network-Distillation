@@ -19,6 +19,7 @@ class Memory:
         segment = self.tree.total() // k
         indices = []
         priorities = []
+        IS = np.zeros(k)
 
         self.beta = np.min([1.0, self.beta + self.beta_growth_rate])
 
@@ -29,6 +30,11 @@ class Memory:
             s = np.random.uniform(low = a, high = b)
             idx, priority, data = self.tree.get(s)
 
+            IS[i] = np.power( (self.tree.min_priority() / priority) )
+            indices.append(idx)
+            batch.append(data)
+            
+        return batch, indices, IS
 
 
     def add(self, error, transition):
