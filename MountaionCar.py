@@ -23,7 +23,7 @@ def test_env_working():
         test_env.render()
         action = test_env.action_space.sample()
         test_env.step(action)
-    testenv.close()
+    test_env.close()
 
 
 if __name__ == "__main__":
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         print("Environment works.")
         exit(0)
 
-    agent = Agent(env, num_actions)
+    agent = Agent(env, num_actions, num_states)
     agent.train()
 
 
