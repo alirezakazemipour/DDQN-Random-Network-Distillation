@@ -34,6 +34,6 @@ if __name__ == "__main__":
         exit(0)
 
     agent = Agent(env, num_actions, num_states)
-    agent.train()
+    agent.run()
 
 

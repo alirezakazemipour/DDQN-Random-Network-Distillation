@@ -28,4 +28,5 @@ class Model:
             self.model.compile(self.opt,
                                loss = "mse",
                                metrics = ["accuracy"])
+            self.model.summary()
 
