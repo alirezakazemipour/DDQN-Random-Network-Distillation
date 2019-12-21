@@ -11,7 +11,7 @@ class Agent:
         self.decay_rate = 5e-5
         self.n_actions = n_actions
         self.n_states = n_states
-        self.max_steps = 100000
+        self.max_steps = 500
         self.max_episodes = 500
         self.target_update_period = 15
         self.mem_size = int(0.8 * self.max_steps)
@@ -42,17 +42,15 @@ class Agent:
 
     def train(self):
 
-        batch, indices, IS = self.memory.sample(np.min[self.batch_size, self.recording_counter])
+        batch, indices, IS = self.memory.sample(np.min([self.batch_size, self.recording_counter]))
 
-        state = batch[:, self.n_states]
+        print("IS shape:", IS.shape)
+
+        state = batch[:, :self.n_states]
         reward = batch[:, self.n_states]
         action = batch[:, self.n_states + 1].astype("int")
         next_state = batch[:, self.n_states + 2:-1]
         done = batch[:, -1]
-        # print("next_state:", next_state)
-
-        # next_state = np.expand_dims( next_state, axis=0 )
-        # print( "next_state shape:", next_state.shape )
 
         target_q = np.max( self.target_model.predict( next_state ) )
         target_q = reward + self.gamma * target_q * (1 - done)
@@ -64,7 +62,8 @@ class Agent:
 
         y[np.arange( self.batch_size ), action] = target_q
 
-        self.eval_model.train_on_batch( state, np.concatenate( [y, IS], axis=-1 ) )
+        loss = self.eval_model.train_on_batch( state, np.concatenate( [y, IS], axis=-1 ) )
+        print("loss:{}".format(loss))
 
         self.memory.update_tree(indices, self.abs_error)
 
@@ -80,13 +79,13 @@ class Agent:
         # print("next_state:", next_state)
 
         next_state = np.expand_dims(next_state, axis = 0)
-        print("next_state:", next_state)
+        # print("next_state:", next_state)
 
         target_q = np.max(self.target_model.predict(next_state))
-        print("target q:", target_q)
+        # print("target q:", target_q)
 
         target_q = reward + self.gamma * target_q * (1 - done)
-        print( "target q:", target_q )
+        # print( "target q:", target_q )
 
         state = np.expand_dims(state, axis = 0)
         eval_q = self.eval_model.predict(state)
@@ -95,7 +94,7 @@ class Agent:
 
         y = eval_q.copy()
 
-        print("action:", action)
+        # print("action:", action)
 
         y[action] = target_q
 
@@ -117,7 +116,7 @@ class Agent:
                 transition = np.array(list(state) + [reward] + [action] + list(next_state) + [done])
                 self.append_transition(transition)
 
-                self.env.render()
+                # self.env.render()
                 if done:
                     self.env.reset()
                 print("step:{}".format(step))

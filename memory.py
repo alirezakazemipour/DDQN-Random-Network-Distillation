@@ -33,7 +33,7 @@ class Memory:
             indices.append(idx)
             batch.append(data)
 
-        return batch, indices, IS
+        return np.array(batch), indices, IS
 
     def add(self, error, transition):
         p = self.get_priority(error)

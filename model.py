@@ -29,6 +29,7 @@ class model:
             self.model.compile(self.opt,
                                loss = self.loss,
                                metrics = ["accuracy"])
+            print(self.model.metrics_names)
             self.model.summary()
 
     @staticmethod
@@ -43,7 +44,7 @@ class model:
 
     def train_on_batch(self, x, y):
 
-        return self.model.predict(x, y)
+        return self.model.train_on_batch(x, y)
 
     def set_weights(self,x):
         return self.model.set_weights(x)
