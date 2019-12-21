@@ -14,7 +14,7 @@ class Agent:
         self.max_steps = 100000
         self.max_episodes = 500
         self.target_update_period = 15
-        self.mem_size = 0.8 * self.max_steps
+        self.mem_size = int(0.8 * self.max_steps)
         self.env = env
         self.recording_counter = 0
         self.batch_size = 32
@@ -30,7 +30,7 @@ class Agent:
         exp_probability = self.min_epsilon + (self.epsilon - self.min_epsilon) * np.exp(-self.decay_rate * step)
 
         if exp < exp_probability:
-            print("epsilon:{:0.3f}".format(exp))
+            # print("epsilon:{:0.3f}".format(exp))
             return np.random.randint(self.n_actions)
         else:
             return np.argmax(self.eval_model.predict(state))
@@ -42,16 +42,25 @@ class Agent:
 
         batch, indices, IS = self.memory.sample(np.min[self.batch_size, self.recording_counter])
 
-        next_state, reward, action, state, done = zip(*list(batch))
+        state = batch[:, self.n_states]
+        reward = batch[:, self.n_states]
+        action = batch[:, self.n_states + 1].astype("int")
+        next_state = batch[:, self.n_states + 2:-1]
+        done = batch[:, -1]
+        # print("next_state:", next_state)
 
-        target_q = np.max(self.target_model.predict(next_state))
+        # next_state = np.expand_dims( next_state, axis=0 )
+        # print( "next_state shape:", next_state.shape )
+
+        target_q = np.max( self.target_model.predict( next_state ) )
         target_q = reward + self.gamma * target_q * (1 - done)
 
-        eval_q = self.eval_model.predict(state)
+        # state = np.expand_dims( state, axis=0 )
+        eval_q = self.eval_model.predict( state )
 
         y = eval_q.copy()
 
-        y[np.arange(self.batch_size), action] = target_q
+        y[np.arange( self.batch_size ), action] = target_q
 
         self.eval_model.train_on_batch( state, np.concatenate( [y, IS], axis=-1 ) )
 
@@ -61,14 +70,27 @@ class Agent:
 
         self.recording_counter += 1
 
-        next_state, reward, action, state, done = zip(*list(transition))
+        state = transition[:self.n_states]
+        reward = transition[self.n_states]
+        action = transition[self.n_states + 1].astype("int")
+        next_state = transition[self.n_states +2:-1]
+        done = transition[-1]
+        # print("next_state:", next_state)
+
+        next_state = np.expand_dims(next_state, axis = 0)
+        print("next_state shape:", next_state.shape)
 
         target_q = np.max(self.target_model.predict(next_state))
         target_q = reward + self.gamma * target_q * (1 - done)
 
+        state = np.expand_dims(state, axis = 0)
         eval_q = self.eval_model.predict(state)
 
+        eval_q = np.squeeze(eval_q, axis = 0)
+
         y = eval_q.copy()
+
+        print("y shape:{}".format(y.shape))
 
         y[np.arange(self.batch_size), action] = target_q
 
@@ -85,7 +107,8 @@ class Agent:
 
                 action = self.choose_action(step, state)
                 next_state, reward, done, _, = self.env.step(action)
-                transition = zip(next_state, reward, action, state, done)
+                # print( "next_state:", next_state)
+                transition = np.array(list(state) + [reward] + [action] + list(next_state) + [done])
                 self.append_transition(transition)
 
                 self.env.render()

@@ -14,7 +14,7 @@ s_high_b = env.observation_space.high
 
 print("Number of states:{}".format(num_states))
 print("Number of actions:{}".format(num_actions))
-print("States bounds:{},{}, {},{}".format(s_low_b[0], s_high_b[0], s_low_b[1], s_high_b[1]))
+print("States bounds:({:0.3f},{:0.3f}), ({:0.3f},{:0.3f})".format(s_low_b[0], s_high_b[0], s_low_b[1], s_high_b[1]))
 
 
 def test_env_working():
