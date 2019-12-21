@@ -2,7 +2,7 @@ from keras.layers import Input, Dense
 from keras.models import Model
 from keras.optimizers import RMSprop
 import keras.backend as K
-
+import numpy as np
 
 
 class model:
@@ -27,7 +27,6 @@ class model:
             self.model.compile(self.opt,
                                loss = self.loss,
                                metrics = ["accuracy"])
-            print(self.model.metrics_names)
             self.model.summary()
 
     @staticmethod
