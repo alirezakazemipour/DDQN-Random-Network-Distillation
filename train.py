@@ -6,15 +6,15 @@ from memory import Memory
 class Agent:
     def __init__(self, env, n_actions, n_states):
 
-        self.epsilon = 1.0
+        self.epsilon = 1
         self.min_epsilon = 0.01
         self.decay_rate = 5e-5
         self.n_actions = n_actions
         self.n_states = n_states
         self.max_steps = 500
-        self.max_episodes = 500
+        self.max_episodes = 20
         self.target_update_period = 15
-        self.mem_size = int(0.8 * self.max_steps)
+        self.mem_size = 10000
         self.env = env
         self.recording_counter = 0
         self.batch_size = 32
@@ -44,8 +44,8 @@ class Agent:
 
         batch, indices, IS = self.memory.sample(np.min([self.batch_size, self.recording_counter]))
 
-        print("IS shape:", IS.shape)
-        print( "Batch shape:", batch.shape )
+        # print("IS shape:", IS.shape)
+        # print( "Batch shape:", batch.shape )
 
         state = batch[:, :self.n_states]
         reward = batch[:, self.n_states]
@@ -53,7 +53,7 @@ class Agent:
         next_state = batch[:, self.n_states + 2:-1]
         done = batch[:, -1]
 
-        print("action shape:{}".format(action.shape))
+        # print("action shape:{}".format(action.shape))
 
         target_q = np.max( self.target_model.predict( next_state ) )
         target_q = reward + self.gamma * target_q * (1 - done)
@@ -79,7 +79,7 @@ class Agent:
         state = transition[:self.n_states]
         reward = transition[self.n_states]
         action = transition[self.n_states + 1].astype("int")
-        next_state = transition[self.n_states +2:-1]
+        next_state = transition[self.n_states + 2: -1]
         done = transition[-1]
 
         next_state = np.expand_dims(next_state, axis = 0)
@@ -116,9 +116,13 @@ class Agent:
                 self.env.render()
                 if done:
                     self.env.reset()
-                print("step:{}".format(step))
                 state = next_state
             self.train()
 
             if episode % self.target_update_period == 0:
                 self.update_train_model()
+                print( "step:{}".format(step))
+
+
+
+                #TODO Clip Td error and reward
