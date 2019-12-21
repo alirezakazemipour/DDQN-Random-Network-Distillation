@@ -44,3 +44,9 @@ class model:
     def train_on_batch(self, x, y):
 
         return self.model.predict(x, y)
+
+    def set_weights(self,x):
+        return self.model.set_weights(x)
+
+    def get_weights(self):
+        return self.model.get_weights()

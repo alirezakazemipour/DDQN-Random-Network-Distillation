@@ -33,6 +33,8 @@ class Agent:
             # print("epsilon:{:0.3f}".format(exp))
             return np.random.randint(self.n_actions)
         else:
+            state = np.expand_dims( state, axis=0 )
+
             return np.argmax(self.eval_model.predict(state))
 
     def update_train_model(self):
@@ -78,10 +80,13 @@ class Agent:
         # print("next_state:", next_state)
 
         next_state = np.expand_dims(next_state, axis = 0)
-        print("next_state shape:", next_state.shape)
+        print("next_state:", next_state)
 
         target_q = np.max(self.target_model.predict(next_state))
+        print("target q:", target_q)
+
         target_q = reward + self.gamma * target_q * (1 - done)
+        print( "target q:", target_q )
 
         state = np.expand_dims(state, axis = 0)
         eval_q = self.eval_model.predict(state)
@@ -90,13 +95,14 @@ class Agent:
 
         y = eval_q.copy()
 
-        print("y shape:{}".format(y.shape))
+        print("action:", action)
 
-        y[np.arange(self.batch_size), action] = target_q
+        y[action] = target_q
 
-        self.abs_error = np.abs(y - eval_q)
+        self.abs_error = np.abs(y[action] - eval_q[action])
+        # print(self.abs_error.shape)
 
-        self.memory.add(self.abs_error, transition) #Unzip where you need
+        self.memory.add(self.abs_error, transition)
 
     def run(self):
 
