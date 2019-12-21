@@ -42,18 +42,13 @@ class Agent:
 
     def train(self):
 
-        batch, indices, IS = self.memory.sample(np.min([self.batch_size, self.recording_counter]))
-
-        print("IS shape:", IS.shape)
-        print( "Batch shape:", batch.shape )
+        batch, indices, IS = self.memory.sample(self.batch_size)
 
         state = batch[:, :self.n_states]
         reward = batch[:, self.n_states]
         action = batch[:, self.n_states + 1].astype("int")
         next_state = batch[:, self.n_states + 2:-1]
         done = batch[:, -1]
-
-        print("action shape:{}".format(action.shape))
 
         target_q = np.max( self.target_model.predict( next_state ) )
         target_q = reward + self.gamma * target_q * (1 - done)
@@ -114,11 +109,14 @@ class Agent:
                 self.append_transition(transition)
 
                 self.env.render()
-                if done:
-                    self.env.reset()
-                print("step:{}".format(step))
+                # if done:
+                #     self.env.reset()
+                # print("step:{}".format(step))
                 state = next_state
-            self.train()
+            if self.recording_counter > self.batch_size:
+                self.train()
+
 
             if episode % self.target_update_period == 0:
                 self.update_train_model()
+                print("Target model updated")

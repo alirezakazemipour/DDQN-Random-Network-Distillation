@@ -40,7 +40,8 @@ class Memory:
         self.tree.add(p, transition)
 
     def get_priority(self, error):
-        p = (np.abs(error) + self.epsilon) ** self.alpha
+        p = np.clip(np.abs(error), -1, 1) # abs is unnecessary here ?
+        p = (p + self.epsilon) ** self.alpha
         return p
 
     def update_tree(self, idx, p):
