@@ -1,10 +1,10 @@
 from keras.layers import Input, Dense
 from keras.models import Model
 from keras.optimizers import Adam
+import keras.backend as K
 
 
-
-class Model:
+class model:
     def __init__(self, n_inputs, n_outputs, lr, do_compile):
         self.n_inputs =  n_inputs
         self.inputs = Input(shape = (self.n_inputs, ))
@@ -26,7 +26,13 @@ class Model:
 
         if do_compile:
             self.model.compile(self.opt,
-                               loss = "mse",
+                               loss = self.loss,
                                metrics = ["accuracy"])
             self.model.summary()
+
+    @staticmethod
+    def loss(y_true, y_pred):
+        IS = K.reshape(y_true[:, -1], (-1, 1))
+        y_true = y_true[:, :-1]
+        return K.mean( IS * K.square(y_true - y_pred))
 

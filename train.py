@@ -1,5 +1,5 @@
 import numpy as np
-from model import Model
+from model import model
 from memory import Memory
 
 
@@ -13,14 +13,15 @@ class Agent:
         self.n_states = n_states
         self.max_steps = 100000
         self.max_episodes = 500
+        self.target_update_period = 15
         self.mem_size = 0.8 * self.max_steps
         self.env = env
         self.recording_counter = 0
         self.batch_size = 32
         self.lr = 0.005
         self.gamma = 0.99
-        self.target_model = Model(self.n_states, n_actions, self.lr, do_compile=False)
-        self.eval_model = Model(self.n_states, n_actions, self.lr, do_compile=True)
+        self.target_model = model(self.n_states, n_actions, self.lr, do_compile=False)
+        self.eval_model = model(self.n_states, n_actions, self.lr, do_compile=True)
         self.memory = Memory(self.mem_size)
 
     def choose_action(self, step, state):
@@ -41,6 +42,20 @@ class Agent:
 
         batch, indices, IS = self.memory.sample(np.min[self.batch_size, self.recording_counter])
 
+        next_state, reward, action, state, done = zip(*list(batch))
+
+        target_q = np.max(self.target_model.predict(next_state))
+        target_q = reward + self.gamma * target_q * (1 - done)
+
+        eval_q = self.eval_model.predict(state)
+
+        y = eval_q.copy()
+
+        y[np.arange(self.batch_size), action] = target_q
+
+        self.eval_model.train_on_batch( state, np.concatenate( [y, IS], axis=-1 ) )
+
+        self.memory.update_tree(indices, self.abs_error)
 
     def append_transition(self, transition):
 
@@ -48,20 +63,22 @@ class Agent:
 
         next_state, reward, action, state, done = zip(*list(transition))
 
-        y = np.max(self.target_model.predict([next_state]))
-        y = reward + self.gamma * y * (1 - done)
+        target_q = np.max(self.target_model.predict(next_state))
+        target_q = reward + self.gamma * target_q * (1 - done)
 
-        y_train = self.eval_model.predict([state])
+        eval_q = self.eval_model.predict(state)
 
-        y_train[np.arange(self.batch_size), action] = y
+        y = eval_q.copy()
 
-        td_error = np.abs(y - y_train)
+        y[np.arange(self.batch_size), action] = target_q
 
-        self.memory.add(td_error, transition) #Unzip where you need
+        self.abs_error = np.abs(y - eval_q)
+
+        self.memory.add(self.abs_error, transition) #Unzip where you need
 
     def run(self):
 
-        for episodes in range(self.max_episodes):
+        for episode in range(self.max_episodes):
             state = self.env.reset()
 
             for step in range(self.max_steps):
@@ -77,3 +94,6 @@ class Agent:
                 print("step:{}".format(step))
                 state = next_state
             self.train()
+
+            if episode % self.target_update_period == 0:
+                self.update_train_model()
