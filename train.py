@@ -2,6 +2,7 @@ import numpy as np
 from model import model
 from memory import Memory
 
+step = 0
 
 class Agent:
     def __init__(self, env, n_actions, n_states):
@@ -105,19 +106,23 @@ class Agent:
 
         for episode in range(self.max_episodes):
             state = self.env.reset()
-
-            for step in range(self.max_steps):
-
+            global step
+            while True:
+                step +=1
                 action = self.choose_action(step, state)
                 next_state, reward, done, _, = self.env.step(action)
+                if done:
+                    reward = 10
                 transition = np.array(list(state) + [reward] + [action] + list(next_state) + [done])
                 self.append_transition(transition)
+                self.train()
 
                 self.env.render()
                 if done:
-                    self.env.reset()
+                    print("episode:{} finished".format(episode))
+                    break
                 state = next_state
-            self.train()
+
 
             if episode % self.target_update_period == 0:
                 self.update_train_model()

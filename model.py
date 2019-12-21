@@ -1,8 +1,8 @@
 from keras.layers import Input, Dense
 from keras.models import Model
-from keras.optimizers import Adam
+from keras.optimizers import RMSprop
 import keras.backend as K
-import numpy as np
+
 
 
 class model:
@@ -11,16 +11,14 @@ class model:
         self.inputs = Input(shape = (self.n_inputs, ), name = "Input_layer")
         self.lr = lr
         self.n_outputs = n_outputs
-        self.opt = Adam(self.lr)
+        self.opt = RMSprop(self.lr)
 
         x = self.inputs
 
-        x = Dense(units = 256,
+        x = Dense(units = 20,
                   activation="relu",
                   kernel_initializer="he_normal")(x)
-        x = Dense(units=256,
-                  activation="relu",
-                  kernel_initializer="he_normal")(x)
+
         self.outputs = Dense(self.n_outputs)(x)
 
         self.model = Model(self.inputs, self.outputs)
