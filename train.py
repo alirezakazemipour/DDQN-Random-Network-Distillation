@@ -33,7 +33,7 @@ class Agent:
             # print("epsilon:{:0.3f}".format(exp))
             return np.random.randint(self.n_actions)
         else:
-            state = np.expand_dims( state, axis=0 )
+            state = np.expand_dims(state, axis=0)
 
             return np.argmax(self.eval_model.predict(state))
 
@@ -45,6 +45,7 @@ class Agent:
         batch, indices, IS = self.memory.sample(np.min([self.batch_size, self.recording_counter]))
 
         print("IS shape:", IS.shape)
+        print( "Batch shape:", batch.shape )
 
         state = batch[:, :self.n_states]
         reward = batch[:, self.n_states]
@@ -52,20 +53,24 @@ class Agent:
         next_state = batch[:, self.n_states + 2:-1]
         done = batch[:, -1]
 
+        print("action shape:{}".format(action.shape))
+
         target_q = np.max( self.target_model.predict( next_state ) )
         target_q = reward + self.gamma * target_q * (1 - done)
 
-        # state = np.expand_dims( state, axis=0 )
         eval_q = self.eval_model.predict( state )
 
         y = eval_q.copy()
 
         y[np.arange( self.batch_size ), action] = target_q
 
-        loss = self.eval_model.train_on_batch( state, np.concatenate( [y, IS], axis=-1 ) )
+        IS = np.expand_dims(IS, axis = 1)
+        loss, _ = self.eval_model.train_on_batch( state, np.concatenate( [y, IS], axis = -1 ) )
         print("loss:{}".format(loss))
 
-        self.memory.update_tree(indices, self.abs_error)
+        for i in range(self.batch_size):
+            abs_error = np.abs( y[i, action[i]] - eval_q[i, action[i]] )
+            self.memory.update_tree(indices[i], abs_error)
 
     def append_transition(self, transition):
 
@@ -76,16 +81,12 @@ class Agent:
         action = transition[self.n_states + 1].astype("int")
         next_state = transition[self.n_states +2:-1]
         done = transition[-1]
-        # print("next_state:", next_state)
 
         next_state = np.expand_dims(next_state, axis = 0)
-        # print("next_state:", next_state)
 
         target_q = np.max(self.target_model.predict(next_state))
-        # print("target q:", target_q)
 
         target_q = reward + self.gamma * target_q * (1 - done)
-        # print( "target q:", target_q )
 
         state = np.expand_dims(state, axis = 0)
         eval_q = self.eval_model.predict(state)
@@ -94,14 +95,11 @@ class Agent:
 
         y = eval_q.copy()
 
-        # print("action:", action)
-
         y[action] = target_q
 
-        self.abs_error = np.abs(y[action] - eval_q[action])
-        # print(self.abs_error.shape)
+        abs_error = np.abs(y[action] - eval_q[action])
 
-        self.memory.add(self.abs_error, transition)
+        self.memory.add(abs_error, transition)
 
     def run(self):
 
@@ -112,11 +110,10 @@ class Agent:
 
                 action = self.choose_action(step, state)
                 next_state, reward, done, _, = self.env.step(action)
-                # print( "next_state:", next_state)
                 transition = np.array(list(state) + [reward] + [action] + list(next_state) + [done])
                 self.append_transition(transition)
 
-                # self.env.render()
+                self.env.render()
                 if done:
                     self.env.reset()
                 print("step:{}".format(step))
