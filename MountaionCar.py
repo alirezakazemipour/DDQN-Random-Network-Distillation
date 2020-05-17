@@ -7,6 +7,7 @@ env_name = "MountainCar-v0"
 env = gym.make(env_name)
 num_states = env.observation_space.shape[0]
 num_actions = env.action_space.n
+num_features = 128
 
 s_low_b = env.observation_space.low
 s_high_b = env.observation_space.high
@@ -33,7 +34,7 @@ if __name__ == "__main__":
         print("Environment works.")
         exit(0)
 
-    agent = Agent(env, num_actions, num_states)
+    agent = Agent(env, num_actions, num_states, num_features)
     agent.run()
 
 

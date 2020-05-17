@@ -1,16 +1,21 @@
 import numpy as np
-from model import model
-from memory import Memory
+from model import Model, RNDModel
+from memory import Memory, Transition
+import torch
+from torch import device
+from torch import from_numpy
+from torch.optim import Adam
 
 
 class Agent:
-    def __init__(self, env, n_actions, n_states):
+    def __init__(self, env, n_actions, n_states, n_encoded_features):
 
         self.epsilon = 1.0
         self.min_epsilon = 0.01
         self.decay_rate = 5e-5
         self.n_actions = n_actions
         self.n_states = n_states
+        self.n_encoded_features = n_encoded_features
         self.max_steps = 500
         self.max_episodes = 500
         self.target_update_period = 15
@@ -20,9 +25,19 @@ class Agent:
         self.batch_size = 32
         self.lr = 0.005
         self.gamma = 0.99
-        self.target_model = model(self.n_states, n_actions, self.lr, do_compile=False)
-        self.eval_model = model(self.n_states, n_actions, self.lr, do_compile=True)
+        self.device = device("cpu")
+
+        self.q_target_model = Model(self.n_states, self.n_actions).to(self.device)
+        self.q_eval_model = Model(self.n_states, self.n_actions).to(self.device)
+        self.q_target_model.load_state_dict(self.q_eval_model.state_dict())
+
+        self.rnd_predictor_model = RNDModel(self.n_states, self.n_encoded_features)
+        self.rnd_target_model = RNDModel(self.n_states, self.n_encoded_features)
+
         self.memory = Memory(self.mem_size)
+
+        self.loss_fn = torch.nn.MSELoss()
+        self.optimizer = Adam(self.q_eval_model.parameters(), lr=self.lr)
 
     def choose_action(self, step, state):
 
@@ -30,71 +45,45 @@ class Agent:
         exp_probability = self.min_epsilon + (self.epsilon - self.min_epsilon) * np.exp(-self.decay_rate * step)
 
         if exp < exp_probability:
-            # print("epsilon:{:0.3f}".format(exp))
             return np.random.randint(self.n_actions)
         else:
             state = np.expand_dims(state, axis=0)
-
-            return np.argmax(self.eval_model.predict(state))
+            return np.argmax(self.q_eval_model(state).item())
 
     def update_train_model(self):
-        self.target_model.set_weights(self.eval_model.get_weights())
+        self.q_target_model.load_state_dict(self.q_eval_model.state_dict())
 
     def train(self):
+        if len(self.memory) < self.batch_size:
+            return 0  # as no loss
+        batch = self.memory.sample(self.batch_size)
+        states, actions, rewards, next_states, dones = self.unpack_batch(batch)
 
-        batch, indices, IS = self.memory.sample(self.batch_size)
+        x = states
+        q_eval = self.q_eval_model(x).gather(dim=1, index=actions)
+        with torch.no_grad():
+            q_next = self.q_target_model(next_states)
 
-        state = batch[:, :self.n_states]
-        reward = batch[:, self.n_states]
-        action = batch[:, self.n_states + 1].astype("int")
-        next_state = batch[:, self.n_states + 2:-1]
-        done = batch[:, -1]
+            q_eval_next = self.q_eval_model(next_states)
+            max_action = torch.argmax(q_eval_next, dim=-1)
 
-        target_q = np.max( self.target_model.predict( next_state ) )
-        target_q = reward + self.gamma * target_q * (1 - done)
+            batch_indices = torch.arange(end=self.batch_size, dtype=torch.int32)
+            target_value = q_next[batch_indices.long(), max_action] * (1 - dones)
 
-        eval_q = self.eval_model.predict( state )
+            q_target = rewards + self.gamma * target_value
+        loss = self.loss_fn(q_eval, q_target.view(self.batch_size, 1))
 
-        y = eval_q.copy()
+        self.optimizer.zero_grad()
+        loss.backward()
+        # torch.nn.utils.clip_grad_norm_(self.eval_model.parameters(), 100)  # clip gradients to help stabilise training
 
-        y[np.arange( self.batch_size ), action] = target_q
+        # for param in self.Qnet.parameters():
+        #     param.grad.data.clamp_(-1, 1)
 
-        IS = np.expand_dims(IS, axis = 1)
-        loss, _ = self.eval_model.train_on_batch( state, np.concatenate( [y, IS], axis = -1 ) )
-        print("loss:{}".format(loss))
+        self.optimizer.step()
+        var = loss.detach().cpu().numpy()
 
-        for i in range(self.batch_size):
-            abs_error = np.abs( y[i, action[i]] - eval_q[i, action[i]] )
-            self.memory.update_tree(indices[i], abs_error)
-
-    def append_transition(self, transition):
-
-        self.recording_counter += 1
-
-        state = transition[:self.n_states]
-        reward = transition[self.n_states]
-        action = transition[self.n_states + 1].astype("int")
-        next_state = transition[self.n_states +2:-1]
-        done = transition[-1]
-
-        next_state = np.expand_dims(next_state, axis = 0)
-
-        target_q = np.max(self.target_model.predict(next_state))
-
-        target_q = reward + self.gamma * target_q * (1 - done)
-
-        state = np.expand_dims(state, axis = 0)
-        eval_q = self.eval_model.predict(state)
-
-        eval_q = np.squeeze(eval_q, axis = 0)
-
-        y = eval_q.copy()
-
-        y[action] = target_q
-
-        abs_error = np.abs(y[action] - eval_q[action])
-
-        self.memory.add(abs_error, transition)
+        return var
 
     def run(self):
 
@@ -102,21 +91,44 @@ class Agent:
             state = self.env.reset()
 
             for step in range(self.max_steps):
-
-                action = self.choose_action(step, state)
+                action = self.choose_action(episode, state)
                 next_state, reward, done, _, = self.env.step(action)
-                transition = np.array(list(state) + [reward] + [action] + list(next_state) + [done])
-                self.append_transition(transition)
-
-                self.env.render()
-                # if done:
-                #     self.env.reset()
-                # print("step:{}".format(step))
-                state = next_state
-            if self.recording_counter > self.batch_size:
+                total_reward = reward + self.get_intrinsic_reward(next_state).detach().clamp(-1, 1)
+                self.store(state, total_reward, done, action, next_state)
                 self.train()
-
+                if done:
+                    break
+                state = next_state
 
             if episode % self.target_update_period == 0:
                 self.update_train_model()
-                print("Target model updated")
+
+    def store(self, state, reward, done, action, next_state):
+        state = from_numpy(state).float().to("cpu")
+        reward = torch.Tensor([reward]).to("cpu")
+        done = torch.Tensor([done]).to("cpu")
+        action = torch.Tensor([action]).to("cpu")
+        next_state = from_numpy(next_state).float().to("cpu")
+        self.memory.add(state, reward, done, action, next_state)
+
+    def get_intrinsic_reward(self, x):
+        x = np.expand_dims(x, axis=0)
+        predicted_features = self.rnd_predictor_model(x)
+        target_features = self.rnd_target_model(x).detach()
+
+        intrinsic_reward = (predicted_features - target_features).pow(2).sum()
+        return intrinsic_reward
+
+    def unpack_batch(self, batch):
+
+        batch = Transition(*zip(*batch))
+
+        states = torch.cat(batch.state).to(self.device).view(self.batch_size, *self.state_shape)
+        actions = torch.cat(batch.action).to(self.device)
+        rewards = torch.cat(batch.reward).to(self.device)
+        next_states = torch.cat(batch.next_state).to(self.device).view(self.batch_size, *self.state_shape)
+        dones = torch.cat(batch.done).to(self.device)
+        states = states.permute(dims=[0, 3, 2, 1])
+        actions = actions.view((-1, 1))
+        next_states = next_states.permute(dims=[0, 3, 2, 1])
+        return states, actions, rewards, next_states, dones
