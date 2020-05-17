@@ -12,7 +12,7 @@ class Agent:
 
         self.epsilon = 1.0
         self.min_epsilon = 0.01
-        self.decay_rate = 5e-3
+        self.decay_rate = 5e-2
         self.n_actions = n_actions
         self.n_states = n_states
         self.n_encoded_features = n_encoded_features
@@ -75,7 +75,7 @@ class Agent:
 
             q_target = i_rewards.detach() + rewards + self.gamma * target_value
         loss = self.loss_fn(q_eval, q_target.view(self.batch_size, 1))
-        predictor_loss = i_rewards.sum()
+        predictor_loss = i_rewards.mean()
 
         self.q_optimizer.zero_grad()
         loss.backward()
@@ -91,10 +91,10 @@ class Agent:
 
     def run(self):
 
-        for episode in range(self.max_episodes):
+        for episode in range(1, 1 + self.max_episodes):
             state = self.env.reset()
             episode_reward = 0
-            for step in range(self.max_steps):
+            for step in range(1, 1 + self.max_steps):
                 action, random_action_prob = self.choose_action(episode, state)
                 next_state, reward, done, _, = self.env.step(action)
                 episode_reward += reward
@@ -105,14 +105,13 @@ class Agent:
                     break
                 state = next_state
 
-            if episode % self.target_update_period == 0:
-                self.update_train_model()
+                if (episode * step) % self.target_update_period == 0:
+                    self.update_train_model()
             print(f"EP:{episode}| "
                   f"DQN loss:{dqn_loss}| "
                   f"RND loss:{rnd_loss}| "
                   f"EP_reward:{episode_reward}| "
                   f"Random action prob:{random_action_prob}| "
-                  f"Step:{step}| "
                   f"Memory size:{len(self.memory)}")
 
     def store(self, state, reward, done, action, next_state):
