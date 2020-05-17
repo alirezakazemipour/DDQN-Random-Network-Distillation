@@ -48,7 +48,8 @@ class Agent:
             return np.random.randint(self.n_actions)
         else:
             state = np.expand_dims(state, axis=0)
-            return np.argmax(self.q_eval_model(state).item())
+            state = from_numpy(state).float().to(self.device)
+            return np.argmax(self.q_eval_model(state).detach().numpy())
 
     def update_train_model(self):
         self.q_target_model.load_state_dict(self.q_eval_model.state_dict())
@@ -60,7 +61,7 @@ class Agent:
         states, actions, rewards, next_states, dones = self.unpack_batch(batch)
 
         x = states
-        q_eval = self.q_eval_model(x).gather(dim=1, index=actions)
+        q_eval = self.q_eval_model(x).gather(dim=1, index=actions.long())
         with torch.no_grad():
             q_next = self.q_target_model(next_states)
 
@@ -113,6 +114,7 @@ class Agent:
 
     def get_intrinsic_reward(self, x):
         x = np.expand_dims(x, axis=0)
+        x = from_numpy(x).float().to(self.device)
         predicted_features = self.rnd_predictor_model(x)
         target_features = self.rnd_target_model(x).detach()
 
@@ -123,12 +125,10 @@ class Agent:
 
         batch = Transition(*zip(*batch))
 
-        states = torch.cat(batch.state).to(self.device).view(self.batch_size, *self.state_shape)
+        states = torch.cat(batch.state).to(self.device).view(self.batch_size, self.n_states)
         actions = torch.cat(batch.action).to(self.device)
         rewards = torch.cat(batch.reward).to(self.device)
-        next_states = torch.cat(batch.next_state).to(self.device).view(self.batch_size, *self.state_shape)
+        next_states = torch.cat(batch.next_state).to(self.device).view(self.batch_size, self.n_states)
         dones = torch.cat(batch.done).to(self.device)
-        states = states.permute(dims=[0, 3, 2, 1])
         actions = actions.view((-1, 1))
-        next_states = next_states.permute(dims=[0, 3, 2, 1])
         return states, actions, rewards, next_states, dones
