@@ -63,7 +63,7 @@ class Agent:
 
         x = states
         q_eval = self.q_eval_model(x).gather(dim=1, index=actions.long())
-        i_rewards = self.get_intrinsic_reward(states.detach().numpy())
+        i_rewards = self.get_intrinsic_reward(next_states.detach().numpy())
         with torch.no_grad():
             q_next = self.q_target_model(next_states)
 
@@ -98,8 +98,8 @@ class Agent:
                 action, random_action_prob = self.choose_action(episode, state)
                 next_state, reward, done, _, = self.env.step(action)
                 episode_reward += reward
-                total_reward = reward + self.get_intrinsic_reward(np.expand_dims(state, 0)).detach().clamp(-1, 1)
-                self.store(state, total_reward, done, action, next_state)
+                # total_reward = reward + self.get_intrinsic_reward(np.expand_dims(state, 0)).detach().clamp(-1, 1)
+                self.store(state, reward, done, action, next_state)
                 dqn_loss, rnd_loss = self.train()
                 if done:
                     break
