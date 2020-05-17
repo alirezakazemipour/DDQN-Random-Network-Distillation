@@ -1,1 +1,1 @@
-# Mountain car: PER+DQN
+# Mountain car: RND+DDQN
