@@ -12,19 +12,19 @@ class Agent:
 
         self.epsilon = 1.0
         self.min_epsilon = 0.01
-        self.decay_rate = 5e-5
+        self.decay_rate = 5e-3
         self.n_actions = n_actions
         self.n_states = n_states
         self.n_encoded_features = n_encoded_features
         self.max_steps = 500
         self.max_episodes = 500
-        self.target_update_period = 15
-        self.mem_size = int(0.8 * self.max_steps)
+        self.target_update_period = 300
+        self.mem_size = 10000
         self.env = env
         self.recording_counter = 0
-        self.batch_size = 32
-        self.lr = 0.005
-        self.gamma = 0.99
+        self.batch_size = 128
+        self.lr = 0.01
+        self.gamma = 0.95
         self.device = device("cpu")
 
         self.q_target_model = Model(self.n_states, self.n_actions).to(self.device)
@@ -40,18 +40,17 @@ class Agent:
         self.q_optimizer = Adam(self.q_eval_model.parameters(), lr=self.lr)
         self.feature_optimizer = Adam(self.rnd_predictor_model.parameters(), lr=self.lr)
 
-
     def choose_action(self, step, state):
 
         exp = np.random.rand()
         exp_probability = self.min_epsilon + (self.epsilon - self.min_epsilon) * np.exp(-self.decay_rate * step)
 
         if exp < exp_probability:
-            return np.random.randint(self.n_actions)
+            return np.random.randint(self.n_actions), exp_probability
         else:
             state = np.expand_dims(state, axis=0)
             state = from_numpy(state).float().to(self.device)
-            return np.argmax(self.q_eval_model(state).detach().numpy())
+            return np.argmax(self.q_eval_model(state).detach().numpy()), exp_probability
 
     def update_train_model(self):
         self.q_target_model.load_state_dict(self.q_eval_model.state_dict())
@@ -64,7 +63,7 @@ class Agent:
 
         x = states
         q_eval = self.q_eval_model(x).gather(dim=1, index=actions.long())
-        i_rewards = self.get_intrinsic_reward(next_states)
+        i_rewards = self.get_intrinsic_reward(states.detach().numpy())
         with torch.no_grad():
             q_next = self.q_target_model(next_states)
 
@@ -74,26 +73,21 @@ class Agent:
             batch_indices = torch.arange(end=self.batch_size, dtype=torch.int32)
             target_value = q_next[batch_indices.long(), max_action] * (1 - dones)
 
-            q_target = i_rewards + rewards + self.gamma * target_value
+            q_target = i_rewards.detach() + rewards + self.gamma * target_value
         loss = self.loss_fn(q_eval, q_target.view(self.batch_size, 1))
-        predictor_loss = i_rewards.mean()
+        predictor_loss = i_rewards.sum()
 
         self.q_optimizer.zero_grad()
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(self.eval_model.parameters(), 100)  # clip gradients to help stabilise training
-
-        # for param in self.Qnet.parameters():
-        #     param.grad.data.clamp_(-1, 1)
-
         self.q_optimizer.step()
-        var = loss.detach().cpu().numpy()
+        dqn_loss = loss.detach().cpu().numpy()
 
         self.feature_optimizer.zero_grad()
         predictor_loss.backward()
         self.feature_optimizer.step()
-        var2 = predictor_loss.detach().cpu().numpy()
+        rnd_loss = predictor_loss.detach().cpu().numpy()
 
-        return var, var2
+        return dqn_loss, rnd_loss
 
     def run(self):
 
@@ -101,19 +95,25 @@ class Agent:
             state = self.env.reset()
             episode_reward = 0
             for step in range(self.max_steps):
-                action = self.choose_action(episode, state)
+                action, random_action_prob = self.choose_action(episode, state)
                 next_state, reward, done, _, = self.env.step(action)
-                episode_reward +=reward
-                # total_reward = reward + self.get_intrinsic_reward(next_state).detach().clamp(-1, 1)
-                self.store(state, reward, done, action, next_state)
-                var, var2 = self.train()
+                episode_reward += reward
+                total_reward = reward + self.get_intrinsic_reward(np.expand_dims(state, 0)).detach().clamp(-1, 1)
+                self.store(state, total_reward, done, action, next_state)
+                dqn_loss, rnd_loss = self.train()
                 if done:
                     break
                 state = next_state
 
             if episode % self.target_update_period == 0:
                 self.update_train_model()
-            print(var, var2, episode_reward)
+            print(f"EP:{episode}| "
+                  f"DQN loss:{dqn_loss}| "
+                  f"RND loss:{rnd_loss}| "
+                  f"EP_reward:{episode_reward}| "
+                  f"Random action prob:{random_action_prob}| "
+                  f"Step:{step}| "
+                  f"Memory size:{len(self.memory)}")
 
     def store(self, state, reward, done, action, next_state):
         state = from_numpy(state).float().to("cpu")
@@ -125,11 +125,11 @@ class Agent:
 
     def get_intrinsic_reward(self, x):
         # x = np.expand_dims(x, axis=0)
-        # x = from_numpy(x).float().to(self.device)
+        x = from_numpy(x).float().to(self.device)
         predicted_features = self.rnd_predictor_model(x)
         target_features = self.rnd_target_model(x).detach()
 
-        intrinsic_reward = (predicted_features - target_features).pow(2).sum()
+        intrinsic_reward = (predicted_features - target_features).pow(2).sum(1)
         return intrinsic_reward
 
     def unpack_batch(self, batch):

@@ -7,7 +7,7 @@ env_name = "MountainCar-v0"
 env = gym.make(env_name)
 num_states = env.observation_space.shape[0]
 num_actions = env.action_space.n
-num_features = 128
+num_features = 64
 
 s_low_b = env.observation_space.low
 s_high_b = env.observation_space.high
