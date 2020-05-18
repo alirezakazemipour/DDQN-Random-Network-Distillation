@@ -12,19 +12,19 @@ class Agent:
 
         self.epsilon = 1.0
         self.min_epsilon = 0.01
-        self.decay_rate = 5e-2
+        self.decay_rate = 5e-3
         self.n_actions = n_actions
         self.n_states = n_states
         self.n_encoded_features = n_encoded_features
         self.max_steps = 500
-        self.max_episodes = 500
-        self.target_update_period = 300
+        self.max_episodes = 1000
+        self.target_update_period = 500
         self.mem_size = 10000
         self.env = env
         self.recording_counter = 0
         self.batch_size = 128
-        self.lr = 0.01
-        self.gamma = 0.95
+        self.lr = 0.001
+        self.gamma = 0.98
         self.device = device("cpu")
 
         self.q_target_model = Model(self.n_states, self.n_actions).to(self.device)
@@ -40,17 +40,16 @@ class Agent:
         self.q_optimizer = Adam(self.q_eval_model.parameters(), lr=self.lr)
         self.feature_optimizer = Adam(self.rnd_predictor_model.parameters(), lr=self.lr)
 
-    def choose_action(self, step, state):
+    def choose_action(self, state):
 
         exp = np.random.rand()
-        exp_probability = self.min_epsilon + (self.epsilon - self.min_epsilon) * np.exp(-self.decay_rate * step)
+        if self.epsilon > exp:
+            return np.random.randint(self.n_actions)
 
-        if exp < exp_probability:
-            return np.random.randint(self.n_actions), exp_probability
         else:
             state = np.expand_dims(state, axis=0)
             state = from_numpy(state).float().to(self.device)
-            return np.argmax(self.q_eval_model(state).detach().numpy()), exp_probability
+            return np.argmax(self.q_eval_model(state).detach().numpy())
 
     def update_train_model(self):
         self.q_target_model.load_state_dict(self.q_eval_model.state_dict())
@@ -91,11 +90,12 @@ class Agent:
 
     def run(self):
 
+        global_running_reward = 0
         for episode in range(1, 1 + self.max_episodes):
             state = self.env.reset()
             episode_reward = 0
             for step in range(1, 1 + self.max_steps):
-                action, random_action_prob = self.choose_action(episode, state)
+                action = self.choose_action(state)
                 next_state, reward, done, _, = self.env.step(action)
                 episode_reward += reward
                 # total_reward = reward + self.get_intrinsic_reward(np.expand_dims(state, 0)).detach().clamp(-1, 1)
@@ -107,12 +107,22 @@ class Agent:
 
                 if (episode * step) % self.target_update_period == 0:
                     self.update_train_model()
-            print(f"EP:{episode}| "
-                  f"DQN loss:{dqn_loss}| "
-                  f"RND loss:{rnd_loss}| "
-                  f"EP_reward:{episode_reward}| "
-                  f"Random action prob:{random_action_prob}| "
-                  f"Memory size:{len(self.memory)}")
+
+            self.epsilon = self.epsilon - self.decay_rate if self.epsilon > self.min_epsilon else self.min_epsilon
+
+            if episode == 1:
+                global_running_reward = episode_reward
+            else:
+                global_running_reward = 0.99 * global_running_reward + 0.01 * episode_reward
+
+            if episode % 100 == 0:
+                print(f"EP:{episode}| "
+                      f"DQN loss:{dqn_loss:3.3f}| "
+                      f"RND loss:{rnd_loss:.6f}| "
+                      f"EP_reward:{episode_reward}| "
+                      f"EP_running_reward:{global_running_reward:3.3f}| "
+                      f"Epsilon:{self.epsilon:2.2f}| "
+                      f"Memory size:{len(self.memory)}")
 
     def store(self, state, reward, done, action, next_state):
         state = from_numpy(state).float().to("cpu")
