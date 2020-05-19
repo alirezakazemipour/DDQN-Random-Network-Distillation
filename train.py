@@ -17,7 +17,7 @@ class Agent:
         self.n_states = n_states
         self.n_encoded_features = n_encoded_features
         self.max_steps = 200
-        self.max_episodes = 10000
+        self.max_episodes = 1500
         self.target_update_period = 500
         self.mem_size = 100000
         self.env = env
