@@ -1,50 +1,52 @@
-from keras.layers import Input, Dense
-from keras.models import Model
-from keras.optimizers import RMSprop
-import keras.backend as K
-import numpy as np
+from torch import nn
+import torch.nn.functional as F
 
 
-class model:
-    def __init__(self, n_inputs, n_outputs, lr, do_compile):
-        self.n_inputs =  n_inputs
-        self.inputs = Input(shape = (self.n_inputs, ), name = "Input_layer")
-        self.lr = lr
+class Model(nn.Module):
+    def __init__(self, n_states, n_actions):
+        super(Model, self).__init__()
+        self.n_states = n_states
+        self.n_actions = n_actions
+
+        self.fc1 = nn.Linear(self.n_states, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.q_values = nn.Linear(128, self.n_actions)
+
+        nn.init.kaiming_normal_(self.fc1.weight)
+        self.fc1.bias.data.zero_()
+        nn.init.kaiming_normal_(self.fc2.weight)
+        self.fc2.bias.data.data.zero_()
+
+        nn.init.xavier_uniform_(self.q_values.weight)
+        self.q_values.bias.data.zero_()
+
+    def forward(self, inputs):
+        x = inputs
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return self.q_values(x)
+
+
+class RNDModel(nn.Module):
+    def __init__(self, n_states, n_outputs):
+        super(RNDModel, self).__init__()
+        self.n_states = n_states
         self.n_outputs = n_outputs
-        self.opt = RMSprop(self.lr)
 
-        x = self.inputs
+        self.fc1 = nn.Linear(self.n_states, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.encoded_features = nn.Linear(128, self.n_outputs)
 
-        x = Dense(units = 20,
-                  activation="relu",
-                  kernel_initializer="he_normal")(x)
+        nn.init.kaiming_normal_(self.fc1.weight)
+        self.fc1.bias.data.data.zero_()
+        nn.init.kaiming_normal_(self.fc2.weight)
+        self.fc2.bias.data.data.zero_()
 
-        self.outputs = Dense(self.n_outputs)(x)
+        nn.init.xavier_uniform_(self.encoded_features.weight)
+        self.encoded_features.bias.data.zero_()
 
-        self.model = Model(self.inputs, self.outputs)
-
-        if do_compile:
-            self.model.compile(self.opt,
-                               loss = self.loss,
-                               metrics = ["accuracy"])
-            self.model.summary()
-
-    @staticmethod
-    def loss(y_true, y_pred):
-        IS = K.reshape(y_true[:, -1], (-1, 1))
-        y_true = y_true[:, :-1]
-        return K.mean( IS * K.square(y_true - y_pred))
-
-    def predict(self, x):
-
-        return self.model.predict(x)
-
-    def train_on_batch(self, x, y):
-
-        return self.model.train_on_batch(x, y)
-
-    def set_weights(self,x):
-        return self.model.set_weights(x)
-
-    def get_weights(self):
-        return self.model.get_weights()
+    def forward(self, inputs):
+        x = inputs
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return self.encoded_features(x)

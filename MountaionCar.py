@@ -1,12 +1,14 @@
 import gym
 import control_flags as flag
 from train import Agent
+from play import Play
 
 env_name = "MountainCar-v0"
 
 env = gym.make(env_name)
 num_states = env.observation_space.shape[0]
 num_actions = env.action_space.n
+num_features = 64
 
 s_low_b = env.observation_space.low
 s_high_b = env.observation_space.high
@@ -14,7 +16,6 @@ s_high_b = env.observation_space.high
 
 print("Number of states:{}".format(num_states))
 print("Number of actions:{}".format(num_actions))
-print("States bounds:({:0.3f},{:0.3f}), ({:0.3f},{:0.3f})".format(s_low_b[0], s_high_b[0], s_low_b[1], s_high_b[1]))
 
 
 def test_env_working():
@@ -33,7 +34,9 @@ if __name__ == "__main__":
         print("Environment works.")
         exit(0)
 
-    agent = Agent(env, num_actions, num_states)
-    agent.run()
+    agent = Agent(env, num_actions, num_states, num_features)
+    # agent.run()
+    player = Play(env, agent)
+    player.evaluate()
 
 
