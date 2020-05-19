@@ -16,29 +16,29 @@ class Agent:
         self.n_actions = n_actions
         self.n_states = n_states
         self.n_encoded_features = n_encoded_features
-        self.max_steps = 500
-        self.max_episodes = 1000
+        self.max_steps = 200
+        self.max_episodes = 10000
         self.target_update_period = 500
-        self.mem_size = 10000
+        self.mem_size = 100000
         self.env = env
         self.recording_counter = 0
-        self.batch_size = 128
+        self.batch_size = 64
         self.lr = 0.001
         self.gamma = 0.98
-        self.device = device("cpu")
+        self.device = device("cuda")
 
         self.q_target_model = Model(self.n_states, self.n_actions).to(self.device)
         self.q_eval_model = Model(self.n_states, self.n_actions).to(self.device)
         self.q_target_model.load_state_dict(self.q_eval_model.state_dict())
 
-        self.rnd_predictor_model = RNDModel(self.n_states, self.n_encoded_features)
-        self.rnd_target_model = RNDModel(self.n_states, self.n_encoded_features)
+        self.rnd_predictor_model = RNDModel(self.n_states, self.n_encoded_features).to(self.device)
+        self.rnd_target_model = RNDModel(self.n_states, self.n_encoded_features).to(self.device)
 
         self.memory = Memory(self.mem_size)
 
         self.loss_fn = torch.nn.MSELoss()
         self.q_optimizer = Adam(self.q_eval_model.parameters(), lr=self.lr)
-        self.feature_optimizer = Adam(self.rnd_predictor_model.parameters(), lr=self.lr)
+        self.feature_optimizer = Adam(self.rnd_predictor_model.parameters(), lr=self.lr / 10)
 
     def choose_action(self, state):
 
@@ -49,7 +49,7 @@ class Agent:
         else:
             state = np.expand_dims(state, axis=0)
             state = from_numpy(state).float().to(self.device)
-            return np.argmax(self.q_eval_model(state).detach().numpy())
+            return np.argmax(self.q_eval_model(state).detach().cpu().numpy())
 
     def update_train_model(self):
         self.q_target_model.load_state_dict(self.q_eval_model.state_dict())
@@ -62,7 +62,7 @@ class Agent:
 
         x = states
         q_eval = self.q_eval_model(x).gather(dim=1, index=actions.long())
-        i_rewards = self.get_intrinsic_reward(next_states.detach().numpy())
+        i_rewards = self.get_intrinsic_reward(states.cpu().detach().numpy())
         with torch.no_grad():
             q_next = self.q_target_model(next_states)
 
@@ -72,9 +72,9 @@ class Agent:
             batch_indices = torch.arange(end=self.batch_size, dtype=torch.int32)
             target_value = q_next[batch_indices.long(), max_action] * (1 - dones)
 
-            q_target = i_rewards.detach() + rewards + self.gamma * target_value
+            q_target = rewards + self.gamma * target_value
         loss = self.loss_fn(q_eval, q_target.view(self.batch_size, 1))
-        predictor_loss = i_rewards.mean()
+        predictor_loss = i_rewards.sum()
 
         self.q_optimizer.zero_grad()
         loss.backward()
@@ -98,8 +98,8 @@ class Agent:
                 action = self.choose_action(state)
                 next_state, reward, done, _, = self.env.step(action)
                 episode_reward += reward
-                # total_reward = reward + self.get_intrinsic_reward(np.expand_dims(state, 0)).detach().clamp(-1, 1)
-                self.store(state, reward, done, action, next_state)
+                total_reward = reward + self.get_intrinsic_reward(np.expand_dims(state, 0)).detach().clamp(-1, 1)
+                self.store(state, total_reward, done, action, next_state)
                 dqn_loss, rnd_loss = self.train()
                 if done:
                     break
@@ -115,21 +115,22 @@ class Agent:
             else:
                 global_running_reward = 0.99 * global_running_reward + 0.01 * episode_reward
 
-            if episode % 100 == 0:
+            if episode % 50 == 0:
                 print(f"EP:{episode}| "
-                      f"DQN loss:{dqn_loss:3.3f}| "
-                      f"RND loss:{rnd_loss:.6f}| "
+                      f"DQN_loss:{dqn_loss:.3f}| "
+                      f"RND_loss:{rnd_loss:.6f}| "
                       f"EP_reward:{episode_reward}| "
-                      f"EP_running_reward:{global_running_reward:3.3f}| "
-                      f"Epsilon:{self.epsilon:2.2f}| "
+                      f"EP_running_reward:{global_running_reward:.3f}| "
+                      f"Epsilon:{self.epsilon:.2f}| "
                       f"Memory size:{len(self.memory)}")
+                self.save_weights()
 
     def store(self, state, reward, done, action, next_state):
-        state = from_numpy(state).float().to("cpu")
-        reward = torch.Tensor([reward]).to("cpu")
-        done = torch.Tensor([done]).to("cpu")
-        action = torch.Tensor([action]).to("cpu")
-        next_state = from_numpy(next_state).float().to("cpu")
+        state = from_numpy(state).float().to("cuda")
+        reward = torch.Tensor([reward]).to("cuda")
+        done = torch.Tensor([done]).to("cuda")
+        action = torch.Tensor([action]).to("cuda")
+        next_state = from_numpy(next_state).float().to("cuda")
         self.memory.add(state, reward, done, action, next_state)
 
     def get_intrinsic_reward(self, x):
@@ -152,3 +153,6 @@ class Agent:
         dones = torch.cat(batch.done).to(self.device)
         actions = actions.view((-1, 1))
         return states, actions, rewards, next_states, dones
+
+    def save_weights(self):
+        torch.save(self.q_eval_model.state_dict(), "weights.pth")
