@@ -2,6 +2,8 @@ import gym
 import control_flags as flag
 from train import Agent
 from play import Play
+import matplotlib.pyplot as plt
+import numpy as np
 
 env_name = "MountainCar-v0"
 
@@ -35,7 +37,14 @@ if __name__ == "__main__":
         exit(0)
 
     agent = Agent(env, num_actions, num_states, num_features)
-    agent.run()
+    running_reward = agent.run()
+
+    episodes = np.arange(agent.max_episodes)
+    plt.style.use("ggplot")
+    plt.figure()
+    plt.plot(episodes, running_reward)
+    plt.savefig("running_reward.png")
+
     player = Play(env, agent)
     player.evaluate()
 

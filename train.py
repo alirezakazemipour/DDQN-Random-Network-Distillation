@@ -62,7 +62,7 @@ class Agent:
 
         x = states
         q_eval = self.q_eval_model(x).gather(dim=1, index=actions.long())
-        i_rewards = self.get_intrinsic_reward(states.cpu().detach().numpy())
+        i_rewards = self.get_intrinsic_reward(states.detach().cpu().numpy())
         with torch.no_grad():
             q_next = self.q_target_model(next_states)
 
@@ -90,6 +90,7 @@ class Agent:
 
     def run(self):
 
+        total_global_running_reward = []
         global_running_reward = 0
         for episode in range(1, 1 + self.max_episodes):
             state = self.env.reset()
@@ -115,6 +116,7 @@ class Agent:
             else:
                 global_running_reward = 0.99 * global_running_reward + 0.01 * episode_reward
 
+            total_global_running_reward.append(global_running_reward)
             if episode % 50 == 0:
                 print(f"EP:{episode}| "
                       f"DQN_loss:{dqn_loss:.3f}| "
@@ -124,6 +126,8 @@ class Agent:
                       f"Epsilon:{self.epsilon:.2f}| "
                       f"Memory size:{len(self.memory)}")
                 self.save_weights()
+
+        return total_global_running_reward
 
     def store(self, state, reward, done, action, next_state):
         state = from_numpy(state).float().to(self.device)
