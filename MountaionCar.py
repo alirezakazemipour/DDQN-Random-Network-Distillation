@@ -1,6 +1,7 @@
 import gym
 import control_flags as flag
 from train import Agent
+from play import Play
 
 env_name = "MountainCar-v0"
 
@@ -34,6 +35,8 @@ if __name__ == "__main__":
         exit(0)
 
     agent = Agent(env, num_actions, num_states, num_features)
-    agent.run()
+    # agent.run()
+    player = Play(env, agent)
+    player.evaluate()
 
 

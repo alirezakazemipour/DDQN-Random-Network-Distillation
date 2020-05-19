@@ -25,7 +25,7 @@ class Agent:
         self.batch_size = 64
         self.lr = 0.001
         self.gamma = 0.98
-        self.device = device("cuda")
+        self.device = device("cpu")
 
         self.q_target_model = Model(self.n_states, self.n_actions).to(self.device)
         self.q_eval_model = Model(self.n_states, self.n_actions).to(self.device)
@@ -126,11 +126,11 @@ class Agent:
                 self.save_weights()
 
     def store(self, state, reward, done, action, next_state):
-        state = from_numpy(state).float().to("cuda")
-        reward = torch.Tensor([reward]).to("cuda")
-        done = torch.Tensor([done]).to("cuda")
-        action = torch.Tensor([action]).to("cuda")
-        next_state = from_numpy(next_state).float().to("cuda")
+        state = from_numpy(state).float().to(self.device)
+        reward = torch.Tensor([reward]).to(self.device)
+        done = torch.Tensor([done]).to(self.device)
+        action = torch.Tensor([action]).to(self.device)
+        next_state = from_numpy(next_state).float().to(self.device)
         self.memory.add(state, reward, done, action, next_state)
 
     def get_intrinsic_reward(self, x):
@@ -156,3 +156,9 @@ class Agent:
 
     def save_weights(self):
         torch.save(self.q_eval_model.state_dict(), "weights.pth")
+
+    def load_weights(self):
+        self.q_eval_model.load_state_dict(torch.load("weights.pth", map_location="cpu"))
+
+    def set_to_eval_mode(self):
+        self.q_eval_model.eval()
