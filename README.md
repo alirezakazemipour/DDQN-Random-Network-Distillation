@@ -24,7 +24,7 @@ pip3 install -r requirements.txt
 
 ## Result
 <p align="center">
-  <img src="https://github.com/alirezakazemipour/DDQN-Random-network-distillation/blob/master/Result/MountainCar.png" height=250>
+  <img src="https://github.com/alirezakazemipour/DDQN-Random-network-distillation/blob/master/Result/MountainCar.png" height=400>
 </p>
 
 ## Reference
