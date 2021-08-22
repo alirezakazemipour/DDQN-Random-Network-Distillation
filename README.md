@@ -1,3 +1,6 @@
+## [Upadte]
+The algorithm is not correct and the repository has remained as just a memory, please don't bother yourself with correctness of the code, it is clearly not. 🙂
+
 # MountainCar: DDQN+RND
 > Implementation of Double Deep Q-Networks with extra bonus produced by random network distillation on the MountainCar environment (discrete version).  
 
