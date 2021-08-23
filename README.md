@@ -1,4 +1,4 @@
-## [Upadte]
+## [Update]
 The algorithm is not correct and the repository has remained as just a memory, please don't bother yourself with correctness of the code, it is clearly not. 🙂
 
 # MountainCar: DDQN+RND
