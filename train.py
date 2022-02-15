@@ -62,7 +62,7 @@ class Agent:
 
         x = states
         q_eval = self.q_eval_model(x).gather(dim=1, index=actions.long())
-        i_rewards = self.get_intrinsic_reward(states.detach().cpu().numpy())
+        i_rewards = self.get_intrinsic_reward(next_states.detach().cpu().numpy())
         with torch.no_grad():
             q_next = self.q_target_model(next_states)
 
@@ -74,7 +74,7 @@ class Agent:
 
             q_target = rewards + self.gamma * target_value
         loss = self.loss_fn(q_eval, q_target.view(self.batch_size, 1))
-        predictor_loss = i_rewards.sum()
+        predictor_loss = i_rewards.mean()
 
         self.q_optimizer.zero_grad()
         loss.backward()
@@ -99,7 +99,7 @@ class Agent:
                 action = self.choose_action(state)
                 next_state, reward, done, _, = self.env.step(action)
                 episode_reward += reward
-                total_reward = reward + self.get_intrinsic_reward(np.expand_dims(state, 0)).detach().clamp(-1, 1)
+                total_reward = reward + self.get_intrinsic_reward(np.expand_dims(next_state, 0)).detach().clamp(-1, 1)
                 self.store(state, total_reward, done, action, next_state)
                 dqn_loss, rnd_loss = self.train()
                 if done:

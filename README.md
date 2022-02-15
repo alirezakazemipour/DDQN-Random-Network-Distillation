@@ -1,6 +1,3 @@
-## [Update]
-The algorithm is not correct and the repository has remained as just a memory, please don't bother yourself with correctness of the code, it is clearly not. 🙂
-
 # MountainCar: DDQN+RND
 > Implementation of Double Deep Q-Networks with extra bonus produced by random network distillation on the MountainCar environment (discrete version).  
 
@@ -23,12 +20,12 @@ pip3 install -r requirements.txt
 
 ## Demo
 <p align="center">
-  <img src="https://github.com/alirezakazemipour/DDQN-Random-network-distillation/blob/master/demo/MountainCar.gif" height=250>
+  <img src="demo/MountainCar.gif" height=250>
 </p>  
 
 ## Result
 <p align="center">
-  <img src="https://github.com/alirezakazemipour/DDQN-Random-network-distillation/blob/master/Result/MountainCar.png" height=400>
+  <img src="Result/MountainCar.png" height=400>
 </p>
 
 ## Reference
